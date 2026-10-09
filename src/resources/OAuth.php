@@ -22,6 +22,12 @@
  * @copyright  2026 Carbure App
  */
 
+namespace ltoinel\resources;
+
+use ltoinel\lib\ApiRoute;
+use ltoinel\lib\Config;
+use ltoinel\lib\WebService;
+
 final class OAuth {
 
     /** Prefix of the client ids */
