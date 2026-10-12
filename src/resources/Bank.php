@@ -13,6 +13,9 @@ namespace ltoinel\resources;
 
 use ltoinel\lib\ApiRoute;
 use ltoinel\lib\Db;
+use ltoinel\lib\Jwt;
+use ltoinel\lib\Logger;
+use ltoinel\lib\WebService;
 use ltoinel\lib\Woob;
 
 final class Bank {
@@ -56,10 +59,10 @@ final class Bank {
     private static function validateAccount($accountNumber, $bankName)
     {
         if (!preg_match('/^[A-Za-z0-9_.:-]{1,100}$/', (string)$accountNumber)) {
-            throw new Error("Invalid account number", 400);
+            throw new \Error("Invalid account number", 400);
         }
         if (!preg_match('/^[A-Za-z0-9_-]{1,50}$/', (string)$bankName)) {
-            throw new Error("Invalid bank (woob backend) name", 400);
+            throw new \Error("Invalid bank (woob backend) name", 400);
         }
     }
 
@@ -74,7 +77,7 @@ final class Bank {
     {
         $account = Db::queryOne("SELECT * FROM bank_account WHERE id = ?", "i", $id);
         if (!$account) {
-            throw new Error("Account not found", 404);
+            throw new \Error("Account not found", 404);
         }
         return $account;
     }
@@ -118,7 +121,7 @@ final class Bank {
         $userId = (int)Jwt::getUserIdFromToken();
 
         if (Db::queryOne("SELECT id FROM bank_account WHERE account_number = ? AND bank_name = ?", "ss", $account_number, $bank_name)) {
-            throw new Error("This account is already followed", 409);
+            throw new \Error("This account is already followed", 409);
         }
 
         $stmt = Db::execute("INSERT INTO bank_account (bank_name, account_number, user_id) VALUES (?, ?, ?)", "ssi", $bank_name, $account_number, $userId);
@@ -144,7 +147,7 @@ final class Bank {
         $userId = (int)$account['user_id'];
 
         if (Db::queryOne("SELECT id FROM bank_account WHERE account_number = ? AND bank_name = ? AND id <> ?", "ssi", $account_number, $bank_name, $id)) {
-            throw new Error("This account is already followed", 409);
+            throw new \Error("This account is already followed", 409);
         }
 
         Db::execute("UPDATE bank_account SET account_number = ?, bank_name = ? WHERE id = ?", "ssi", $account_number, $bank_name, $id);
@@ -206,7 +209,7 @@ final class Bank {
     {
         User::requireAdmin();
         if (!preg_match('/^[a-z0-9_]{1,50}$/', (string)$module)) {
-            throw new Error("Invalid woob module", 400);
+            throw new \Error("Invalid woob module", 400);
         }
         return Woob::moduleFields($module);
     }
@@ -227,10 +230,10 @@ final class Bank {
     {
         User::requireAdmin();
         if (!preg_match('/^[a-z0-9_]{1,50}$/', (string)$module) || !preg_match('/^[a-z0-9_-]{1,50}$/', (string)$backend)) {
-            throw new Error("Invalid woob module or bank name (lowercase letters, digits, - and _)", 400);
+            throw new \Error("Invalid woob module or bank name (lowercase letters, digits, - and _)", 400);
         }
         if (in_array($backend, array_column(Woob::listBackends(), 'name'), true)) {
-            throw new Error("A bank named $backend is already configured in woob", 409);
+            throw new \Error("A bank named $backend is already configured in woob", 409);
         }
 
         // Every setting of the module is given (woob would ask for a missing one),
@@ -242,17 +245,17 @@ final class Bank {
                 $value = $field['default'];
             }
             if ($value === '' && $field['required']) {
-                throw new Error("Missing setting: " . $field['label'], 400);
+                throw new \Error("Missing setting: " . $field['label'], 400);
             }
             if (preg_match('/[\x00-\x1f\x7f"\\\\]/', $value) || preg_match('/\s/', $value) || mb_strlen($value) > 200) {
-                throw new Error("Invalid value for " . $field['label'] . " (no spaces nor quotes)", 400);
+                throw new \Error("Invalid value for " . $field['label'] . " (no spaces nor quotes)", 400);
             }
             if ($value !== '' && $field['choices'] && !in_array($value, array_column($field['choices'], 'value'), true)) {
-                throw new Error("Invalid choice for " . $field['label'], 400);
+                throw new \Error("Invalid choice for " . $field['label'], 400);
             }
             if ($value !== '' && $field['regexp'] && @preg_match('/' . str_replace('/', '\\/', $field['regexp']) . '/u', '') !== false
                 && !preg_match('/' . str_replace('/', '\\/', $field['regexp']) . '/u', $value)) {
-                throw new Error("Invalid format for " . $field['label'], 400);
+                throw new \Error("Invalid format for " . $field['label'], 400);
             }
             $params[$field['key']] = $value;
         }
@@ -260,7 +263,7 @@ final class Bank {
         try {
             Woob::addBackend($module, $backend, $params);
         } catch (Exception $e) {
-            throw new Error($e->getMessage(), 400);
+            throw new \Error($e->getMessage(), 400);
         }
 
         // Accounts of the new bank, to follow them: the first connection to the bank.
@@ -268,9 +271,9 @@ final class Bank {
         // woob so that the form can be sent again
         try {
             $accounts = array_values(array_filter(self::discover(), fn($account) => $account['bank_name'] === $backend));
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             Woob::removeBackend($backend);
-            throw new Error("The bank refused the connection, check the credentials: " . $e->getMessage(), 400);
+            throw new \Error("The bank refused the connection, check the credentials: " . $e->getMessage(), 400);
         }
         return ['backend' => $backend, 'accounts' => $accounts];
     }
@@ -356,7 +359,7 @@ final class Bank {
             return;
         }
 
-        throw new Error("Unauthorized - Invalid or missing JWT token or sync token", 401);
+        throw new \Error("Unauthorized - Invalid or missing JWT token or sync token", 401);
     }
 
     /**
@@ -375,7 +378,7 @@ final class Bank {
         $bankIds = self::getBankIds();
         if ($account !== null && $account !== '') {
             if (!in_array($account, $bankIds, true)) {
-                throw new Error("Account not found", 404);
+                throw new \Error("Account not found", 404);
             }
             $bankIds = [$account];
         }

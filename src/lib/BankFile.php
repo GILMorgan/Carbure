@@ -14,6 +14,8 @@
 
 namespace ltoinel\lib;
 
+use Error;
+
 final class BankFile
 {
     /** Largest file accepted (bytes): base64 encoded, it stays under the 2 MB of nginx */
