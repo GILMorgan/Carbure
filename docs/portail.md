@@ -79,6 +79,11 @@ modification.
   (coche verte) ou non vérifiée. Les transactions non vérifiées sont en gras.
 - **Filtre** : à côté du nombre de transactions, un interrupteur limite la liste aux
   transactions non vérifiées (avec leur nombre).
+- **Transactions récurrentes** : celles retrouvées chaque mois (salaire, loyer,
+  abonnements, factures, `GET /transaction/recurring`) portent le badge « Mensuelle ». Un
+  second interrupteur n'affiche qu'elles et liste celles qui ne sont pas encore arrivées
+  (« Attendues ce mois-ci », avec leur jour habituel et leur montant, « ≈ » s'il varie ;
+  « Absentes ce mois-ci » pour un mois passé). Il n'apparaît pas pendant une recherche.
 - **Recherche** : le champ de recherche (2 caractères minimum) interroge
   `GET /transaction/search` sur tous les mois et affiche le **total** des transactions
   trouvées ; le filtre s'applique aussi aux résultats. La croix efface la recherche.
@@ -98,7 +103,9 @@ modification.
   avec un autre libellé : non cochée) ou **déjà présente** (même identifiant : ignorée).
   Les transactions importées appartiennent à l'utilisateur connecté et passent par les
   règles de catégorisation ; la liste s'ouvre ensuite sur le dernier mois importé
-  (`POST /transaction/import/preview`, `POST /transaction/import`).
+  (`POST /transaction/import/preview`, `POST /transaction/import`). Aucun compte synchronisé
+  n'est nécessaire : sur un mois vide (nouvelle installation), le bouton est proposé au
+  centre de la page, ce qui permet d'utiliser Carbure uniquement avec des relevés.
 
 ## Budget
 
@@ -198,9 +205,12 @@ protégée.
   « Ajouté par » (l'utilisateur qui l'a ajouté), la date et le statut de sa dernière
   synchronisation (Synchronisé, Échec ou Jamais synchronisé ; le détail au survol), et
   trois actions : **synchroniser ce compte**, modifier, ne plus suivre (les transactions
-  déjà importées sont conservées).
+  déjà importées sont conservées). Un compte s'affiche « BANQUE ···1234 » (banque et fin
+  de l'identifiant), ou sous le **nom** qui lui a été donné (facultatif, ex. « Compte
+  joint »), aussi dans la synchronisation et le détail d'une transaction.
 - **+** (fenêtre modale) : « Rechercher mes comptes dans woob » liste les comptes des
-  banques configurées dans woob (libellé, solde) et les suit en un clic ; sinon choisir la
+  banques configurées dans woob (libellé, solde) et les suit en un clic (le libellé woob
+  pré-remplit le nom du compte) ; sinon choisir la
   banque (configurée dans woob, ou parmi toutes celles que woob supporte) et saisir
   l'identifiant du compte. Pour une banque pas encore configurée, le formulaire demande les
   identifiants attendus par son module woob (numéro client, code, type de compte…) :
@@ -208,11 +218,28 @@ protégée.
   et affiche les comptes trouvés, à suivre en un clic.
 - **Synchronisation** : progression en direct, statut OK/KO de chaque étape par compte
   (opérations à venir, historique, notifications), nombre de transactions reçues et
-  nouvelles, journal détaillé. En cas d'échec woob, un lien ouvre la recherche des tickets
-  woob sur le module concerné. Pendant une synchronisation, l'icône de l'onglet tourne.
+  nouvelles, journal détaillé. Avec le réglage `woob_debug`, le journal affiche aussi, en
+  direct, les logs de débogage de woob (requêtes vers la banque, trace de l'erreur Python),
+  à un administrateur uniquement. En cas d'échec woob, un lien ouvre la recherche des tickets
+  woob sur le module concerné. Si aucun compte n'a pu être synchronisé, la catégorisation
+  est sautée : seule l'erreur est notifiée. Pendant une synchronisation, l'icône de l'onglet tourne.
 
 La synchronisation de tous les comptes est planifiée côté serveur (`SYNC_INTERVAL` avec
 Docker, ou une tâche cron).
+
+### Authentification forte (2FA)
+
+Certaines banques (Crédit Mutuel, CIC…) demandent régulièrement de valider la connexion
+dans leur application. La synchronisation planifiée ne déclenche jamais cette validation :
+elle échoue, le compte passe en **Authentification forte requise** et chaque utilisateur
+reçoit la notification « Strong authentication needed » sur l'app iOS. Le bouton
+**Valider l'authentification forte** (sur la ligne du compte ou sous l'erreur) relance la
+synchronisation de ce compte en mode interactif : woob déclenche la demande, son message
+s'affiche (« validez dans votre application… ») et la synchronisation attend la validation
+sur le téléphone. La session obtenue reste valable plusieurs semaines (souvent 90 jours,
+règle DSP2) ; les synchronisations planifiées fonctionnent de nouveau jusque-là.
+
+Les authentifications qui demandent de **saisir un code** (SMS) ne sont pas encore gérées.
 
 ## Agent IA
 

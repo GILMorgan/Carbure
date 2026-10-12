@@ -107,6 +107,30 @@ test('displayedTransactions, stats and totals', () => {
     assert.equal(Math.round(stats.expense * 100) / 100, -1032.4);
 });
 
+test('recurring transactions: ids, filter and expected series', () => {
+    const recurring = [
+        { label: 'VIR SALAIRE ACME', ids: [1], status: 'received' },
+        { label: 'PRLV LOYER AGENCE', ids: ['3'], status: 'received' },
+        { label: 'CB NETFLIX.COM', ids: [], status: 'expected' },
+    ];
+    const recurringIds = transactions.computed.recurringIds.call({ recurring });
+    assert.deepEqual([...recurringIds], [1, 3]);
+    assert.deepEqual(transactions.computed.recurringExpected.call({ recurring }).map(s => s.label), ['CB NETFLIX.COM']);
+
+    const list = [
+        { id: 1, amount: '3200.00', pointed: '1' },
+        { id: 2, amount: '-82.40', pointed: '0' },
+        { id: 3, amount: '-950.00', pointed: '0' },
+    ];
+    const context = { transactions: list, searchResults: list, isSearching: false, transactionFilter: 'all', recurringOnly: true, recurringIds };
+    context.isRecurring = transactions.methods.isRecurring.bind(context);
+    assert.deepEqual(transactions.computed.displayedTransactions.call(context).map(t => t.id), [1, 3]);
+    // Combined with the unchecked filter
+    assert.deepEqual(transactions.computed.displayedTransactions.call({ ...context, transactionFilter: 'unchecked' }).map(t => t.id), [3]);
+    // Not applied to the search results (other months)
+    assert.equal(transactions.computed.displayedTransactions.call({ ...context, isSearching: true }).length, 3);
+});
+
 test('isSearching: from 2 characters', () => {
     assert.equal(transactions.computed.isSearching.call({ searchQuery: ' a ' }), false);
     assert.equal(transactions.computed.isSearching.call({ searchQuery: 'ed' }), true);
@@ -121,9 +145,11 @@ test('agentConfigurations: the MCP URL and the token in each configuration', () 
     const url = 'https://carbure.example.com/api/mcp';
     const configs = agentConfigurations(url, 'tok-123');
     assert.deepEqual(configs.map(c => c.id), ['claude-code', 'chatgpt', 'cursor', 'vscode', 'gemini']);
+    // Counted, not searched with includes(): a test, not a check of a URL
+    const occurrences = (text, part) => text.split(part).length - 1;
     for (const config of configs) {
-        assert.ok(config.code.includes(url), config.id);
-        assert.ok(config.code.includes('tok-123'), config.id);
+        assert.ok(occurrences(config.code, url) > 0, config.id);
+        assert.ok(occurrences(config.code, 'tok-123') > 0, config.id);
     }
     assert.deepEqual(JSON.parse(configs.find(c => c.id === 'cursor').code), { mcpServers: { carbure: { url, headers: { Authorization: 'Bearer tok-123' } } } });
 });
@@ -141,4 +167,45 @@ test('config: curl command of the synchronization', async () => {
     assert.equal(syncCommand('https://x.fr/api/bank/sync', 'abc'), 'curl -sN -H "X-Sync-Token: abc" "https://x.fr/api/bank/sync"');
     assert.equal(syncCommand('https://x.fr/api/bank/sync', 'abc', '123@bnp'), 'curl -sN -H "X-Sync-Token: abc" "https://x.fr/api/bank/sync?account=123%40bnp"');
     assert.equal(syncCommand('https://x.fr/api/bank/sync', null), 'curl -sN "https://x.fr/api/bank/sync"');
+});
+
+test('accountName: the name given to the account, else the bank and the end of the number', async () => {
+    const { createAccountsModule } = await import('../../portal/modules/accountsModule.js');
+    const { methods } = createAccountsModule(() => null);
+    const context = {
+        bankAccounts: [
+            { bankId: '00012345678@bnp', account_number: '00012345678', bank_name: 'bnp', label: 'Compte joint' },
+            { bankId: '999@bnp', account_number: '999', bank_name: 'bnp', label: null },
+        ],
+    };
+    context.accountName = methods.accountName.bind(context);
+    context.bankIdName = methods.bankIdName.bind(context);
+
+    assert.equal(context.accountName(context.bankAccounts[0]), 'Compte joint');
+    assert.equal(context.accountName(context.bankAccounts[1]), 'BNP ···999');
+    // A transaction of a followed account: the name of the account, not its own label
+    assert.equal(context.accountName({ bank_name: 'bnp', account_number: '00012345678', label: 'CB PAUL' }), 'Compte joint');
+    assert.equal(context.accountName({ bank_name: 'lcl', account_number: '11112222', label: 'CB PAUL' }), 'LCL ···2222');
+    // Imported statement file: no bank
+    assert.equal(context.accountName({ bank_name: null, account_number: 'FR761234' }), '···1234');
+    assert.equal(context.bankIdName('00012345678@bnp'), 'Compte joint');
+    assert.equal(context.bankIdName('fail@bank'), 'BANK ···fail');
+});
+
+test('sync: the debug logs of woob are not steps nor transactions', async () => {
+    const { createSyncModule } = await import('../../portal/modules/syncModule.js');
+    const { syncSteps } = createSyncModule(() => null).computed;
+    const steps = syncSteps.call({
+        syncStatus: 'error',
+        syncLog: [
+            'Syncing 1@bnp (coming)...',
+            'Woob debug 1@bnp: DEBUG:woob.browser:Request: GET https://bank.example/accounts',
+            'Woob debug 1@bnp: Error while calling woob',
+            'Error syncing 1@bnp: Error while calling woob (exit code: 1): 500 Server Error',
+            'Notifying users of 1@bnp...',
+            'Synchronization complete',
+        ],
+    });
+    assert.deepEqual(steps.global, []);
+    assert.deepEqual(steps.accounts[0].steps.map(s => [s.kind, s.status, s.count]), [['coming', 'error', 0], ['notify', 'ok', 0]]);
 });

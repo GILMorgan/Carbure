@@ -452,12 +452,17 @@
                                         </button>
                                     </div>
                                     <div class="transaction-count">{{ t('transactionCount', { count: isSearching ? searchResults.length : transactions.length }) }}</div>
-                                    <label class="toggle-switch" :class="{ on: transactionFilter === 'unchecked' }">
+                                    <label class="toggle-switch toggle-unchecked" :class="{ on: transactionFilter === 'unchecked' }">
                                         <input type="checkbox" role="switch"
                                                :checked="transactionFilter === 'unchecked'"
                                                @change="transactionFilter = $event.target.checked ? 'unchecked' : 'all'" />
                                         <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
                                         <span class="toggle-label">{{ t('uncheckedCount', { count: (isSearching ? searchResults : transactions).filter(t => !Number(t.pointed)).length }) }}</span>
+                                    </label>
+                                    <label v-if="!isSearching && recurring.length > 0" class="toggle-switch toggle-recurring" :class="{ on: recurringOnly }">
+                                        <input type="checkbox" role="switch" v-model="recurringOnly" />
+                                        <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                                        <span class="toggle-label">{{ t('recurringCount', { count: recurring.length }) }}</span>
                                     </label>
                                     <button type="button" class="btn-secondary btn-import" @click="openImport" :title="t('importTitle')">
                                         <span class="material-icons" aria-hidden="true">upload_file</span>{{ t('importButton') }}
@@ -476,9 +481,24 @@
                                 <button @click="createSuggestedRule">{{ t('createRule') }}</button>
                                 <button class="btn-secondary" @click="ruleSuggestion = null">{{ t('ignore') }}</button>
                             </div>
+                            <section v-if="recurringOnly && !isSearching && recurringExpected.length > 0" class="recurring-expected">
+                                <h3>
+                                    <span class="material-icons" aria-hidden="true">schedule</span>
+                                    {{ isCurrentMonth ? t('recurringExpectedTitle') : t('recurringMissingTitle') }}
+                                </h3>
+                                <ul>
+                                    <li v-for="series in recurringExpected" :key="series.label + series.amount">
+                                        <span class="recurring-expected-label">{{ series.label }}</span>
+                                        <span class="recurring-expected-day">{{ t('recurringDay', { day: series.day }) }}</span>
+                                        <span class="recurring-expected-amount" :class="series.amount >= 0 ? 'positive' : 'negative'">
+                                            {{ series.variable ? '≈ ' : '' }}{{ formatAmount(series.variable ? series.average : series.amount) }} {{ t('currencySymbol') }}
+                                        </span>
+                                    </li>
+                                </ul>
+                            </section>
                             <div v-if="searching" class="transactions-hint">{{ t('searching') }}</div>
                             <div v-else-if="displayedTransactions.length === 0" class="transactions-hint">
-                                {{ isSearching ? t('noSearchResults') : t('allChecked') }}
+                                {{ isSearching ? t('noSearchResults') : recurringOnly ? t('noRecurringReceived') : t('allChecked') }}
                             </div>
                             <div class="transactions-list">
                                 <div v-for="transaction in displayedTransactions" :key="transaction.id" class="transaction-item"
@@ -496,7 +516,12 @@
                                          :aria-label="t('transactionDetail') + ' : ' + transaction.label"
                                          @click="openTransactionModal(transaction)" @keydown.enter.prevent="openTransactionModal(transaction)" @keydown.space.prevent="openTransactionModal(transaction)">
                                         <div class="transaction-label">{{ transaction.label }}</div>
-                                        <div class="transaction-date">{{ formatDate(transaction.rdate || transaction.date) }}</div>
+                                        <div class="transaction-date">
+                                            {{ formatDate(transaction.rdate || transaction.date) }}
+                                            <span v-if="isRecurring(transaction)" class="recurring-badge" :title="t('recurringBadgeTitle')">
+                                                <span class="material-icons" aria-hidden="true">autorenew</span>{{ t('recurringBadge') }}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div class="transaction-category">
                                         <category-picker v-if="isUncategorized(transaction) && ruleCategoryOptions.length > 0" compact
@@ -517,6 +542,11 @@
                         <div class="empty-state">
                             <div class="material-icons" aria-hidden="true">inbox</div>
                             <p>{{ t('emptyMessage') }}</p>
+                            <!-- Also without a synchronized account: a statement file is enough -->
+                            <p class="empty-state-hint">{{ t('emptyImportHint') }}</p>
+                            <button type="button" class="btn-secondary btn-import" @click="openImport" :title="t('importTitle')">
+                                <span class="material-icons" aria-hidden="true">upload_file</span>{{ t('importButton') }}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1144,11 +1174,15 @@
                                          :title="a.last_sync_message || ''">
                                         <span class="material-icons" aria-hidden="true">{{ { OK: 'check_circle', ERROR: 'error' }[a.last_sync_status] || 'schedule' }}</span>
                                         <span>
-                                            <span class="account-sync-state">{{ a.last_sync_status ? t('lastSync_' + a.last_sync_status) : t('lastSyncNever') }}</span>
+                                            <span class="account-sync-state">{{ a.last_sync_status === 'ERROR' && needsTwoFactor(a.last_sync_message) ? t('lastSync2fa') : a.last_sync_status ? t('lastSync_' + a.last_sync_status) : t('lastSyncNever') }}</span>
                                             <span v-if="a.last_sync_at" class="account-sync-date">{{ formatSyncDate(a.last_sync_at) }}</span>
                                         </span>
                                     </div>
                                     <div class="device-actions">
+                                        <button v-if="a.last_sync_status === 'ERROR' && needsTwoFactor(a.last_sync_message)" class="btn-secondary sync-2fa-button account-2fa-button" @click="startSync(a.bankId, true)" :disabled="syncStatus === 'running'">
+                                            <span class="material-icons" aria-hidden="true">phonelink_lock</span>
+                                            {{ t('sync2faButton') }}
+                                        </button>
                                         <button class="btn-icon" @click="startSync(a.bankId)" :disabled="syncStatus === 'running'" :title="t('syncAccount')" :aria-label="t('syncAccount')">
                                             <span class="material-icons" aria-hidden="true" :class="{ spin: syncStatus === 'running' && syncTarget === a.bankId }">sync</span>
                                         </button>
@@ -1167,11 +1201,15 @@
                                 <span>{{ t('syncStatus_' + syncStatus) }}</span>
                                 <span v-if="syncDuration !== null" class="sync-duration">{{ t('syncDuration', { seconds: syncDuration }) }}</span>
                             </div>
+                            <p v-if="syncInteractive && syncStatus === 'running'" class="sync-2fa-hint">
+                                <span class="material-icons inline-icon" aria-hidden="true">phonelink_lock</span>
+                                {{ t('sync2faWaiting') }}
+                            </p>
                             <div class="sync-steps">
                                 <div v-for="acc in syncSteps.accounts" :key="acc.id" class="sync-account">
                                     <div class="sync-account-name">
                                         <span class="material-icons" aria-hidden="true">account_balance</span>
-                                        {{ acc.id.split('@')[1].toUpperCase() }} ···{{ acc.id.split('@')[0].slice(-4) }}
+                                        {{ bankIdName(acc.id) }}
                                     </div>
                                     <ul>
                                         <li v-for="(step, i) in acc.steps" :key="i" class="sync-step" :class="'step-' + step.status">
@@ -1184,8 +1222,19 @@
                                                 <span v-else-if="step.count" class="sync-step-count">{{ t('syncStepCount', { count: step.count }) }}</span>
                                             </span>
                                             <span class="sync-step-state">{{ t('syncState_' + step.status) }}</span>
+                                            <div v-if="step.message && step.status === 'running'" class="sync-step-message" role="status">
+                                                <span class="material-icons inline-icon" aria-hidden="true">phonelink_lock</span>
+                                                {{ step.message }}
+                                            </div>
                                             <div v-if="step.error" class="sync-step-error">
                                                 {{ step.error }}
+                                                <template v-if="needsTwoFactor(step.error)">
+                                                    <span class="sync-2fa-help">{{ t('sync2faHelp') }}</span>
+                                                    <button class="btn-secondary sync-2fa-button" @click="startSync(acc.id, true)" :disabled="syncStatus === 'running'">
+                                                        <span class="material-icons" aria-hidden="true">phonelink_lock</span>
+                                                        {{ t('sync2faButton') }}
+                                                    </button>
+                                                </template>
                                                 <a v-if="/woob/i.test(step.error)" class="woob-issues-link" :href="woobIssuesUrl(acc.id)" target="_blank" rel="noopener">
                                                     <span class="material-icons inline-icon" aria-hidden="true">bug_report</span>
                                                     {{ t('woobIssues', { module: acc.id.split('@').pop() }) }}
@@ -1210,7 +1259,7 @@
                                 {{ showSyncLog ? t('syncHideLog') : t('syncShowLog') }}
                             </button>
                             <ol v-if="showSyncLog" class="sync-log" aria-live="polite">
-                                <li v-for="(line, i) in syncLog" :key="i">{{ line }}</li>
+                                <li v-for="(line, i) in syncLog" :key="i" :class="{ 'sync-log-debug': line.startsWith('Woob debug ') }">{{ line }}</li>
                             </ol>
                         </section>
                     </div>
@@ -2143,6 +2192,11 @@
                     <div class="form-group">
                         <label for="field-3">{{ t('accountNumber') }} *</label>
                         <input id="field-3" v-model="accountForm.account_number" maxlength="100" />
+                    </div>
+                    <div class="form-group">
+                        <label for="field-account-label">{{ t('accountLabel') }}</label>
+                        <input id="field-account-label" v-model="accountForm.label" maxlength="100" :placeholder="t('accountLabelPlaceholder')" aria-describedby="account-label-help" />
+                        <small id="account-label-help">{{ t('accountLabelHelp') }}</small>
                     </div>
                 </div>
                 <div class="modal-footer">

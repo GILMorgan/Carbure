@@ -141,6 +141,17 @@ export function createApiService(baseUrl, authToken = null, onUnauthorized = nul
     }
 
     /**
+     * Fetches the recurring transactions of a month (found about once a month)
+     * @param {number} month - Month (1-12)
+     * @param {number} year - Year
+     * @returns {Promise<Array>} Series: {label, category, amount, average, variable, day, months, last, ids, status}
+     */
+    async function fetchRecurring(month, year) {
+        const data = await request(`${baseUrl}/transaction/recurring?month=${month}&year=${year}`, {}, 'Failed to fetch the recurring transactions');
+        return Array.isArray(data) ? data : [];
+    }
+
+    /**
      * Fetches the transactions of a category (sub-categories included) for a month
      * @param {number} month - Month (1-12)
      * @param {number} year - Year
@@ -476,10 +487,11 @@ export function createApiService(baseUrl, authToken = null, onUnauthorized = nul
      * Follows a bank account
      * @param {string} account_number - Account identifier in woob
      * @param {string} bank_name - woob backend name
+     * @param {string} label - Name given to the account ('' for none)
      * @returns {Promise<Object>} The account
      */
-    async function createBankAccount(account_number, bank_name) {
-        return request(`${baseUrl}/bank`, { method: 'POST', body: JSON.stringify({ account_number, bank_name }) }, 'Failed to add the account');
+    async function createBankAccount(account_number, bank_name, label = '') {
+        return request(`${baseUrl}/bank`, { method: 'POST', body: JSON.stringify({ account_number, bank_name, label }) }, 'Failed to add the account');
     }
 
     /**
@@ -487,10 +499,11 @@ export function createApiService(baseUrl, authToken = null, onUnauthorized = nul
      * @param {number} id - Account ID
      * @param {string} account_number - Account identifier in woob
      * @param {string} bank_name - woob backend name
+     * @param {string} label - Name given to the account ('' removes it)
      * @returns {Promise<Object>} The account
      */
-    async function updateBankAccount(id, account_number, bank_name) {
-        return request(`${baseUrl}/bank`, { method: 'PUT', body: JSON.stringify({ id, account_number, bank_name }) }, 'Failed to modify the account');
+    async function updateBankAccount(id, account_number, bank_name, label = '') {
+        return request(`${baseUrl}/bank`, { method: 'PUT', body: JSON.stringify({ id, account_number, bank_name, label }) }, 'Failed to modify the account');
     }
 
     /**
@@ -555,11 +568,15 @@ export function createApiService(baseUrl, authToken = null, onUnauthorized = nul
      * ": heartbeat" comments while woob is working.
      * @param {Function} onMessage - Called with each progress message
      * @param {string|null} account - Synchronize only this account (bankId)
+     * @param {boolean} interactive - Allow the bank to ask a two-factor authentication (one account)
      * @returns {Promise<void>} Resolved when the synchronization ends
      * @throws {Error} If the request fails
      */
-    async function syncBanks(onMessage, account = null) {
-        const query = account ? `?account=${encodeURIComponent(account)}` : '';
+    async function syncBanks(onMessage, account = null, interactive = false) {
+        let query = account ? `?account=${encodeURIComponent(account)}` : '';
+        if (account && interactive) {
+            query += '&interactive=true';
+        }
         const response = await authFetch(`${baseUrl}/bank/sync${query}`, { headers: getHeaders() });
 
         if (!response.ok || !response.body) {
@@ -857,6 +874,7 @@ export function createApiService(baseUrl, authToken = null, onUnauthorized = nul
     return {
         abortAllExcept,
         fetchTransactions,
+        fetchRecurring,
         fetchBudget,
         fetchOAuthClient,
         approveOAuth,

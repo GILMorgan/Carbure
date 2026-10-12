@@ -1101,6 +1101,19 @@ button .material-icons {
     font-weight: 400;
 }
 
+.empty-state p.empty-state-hint {
+    max-width: 480px;
+    margin: 8px auto 20px;
+    font-size: 14px;
+}
+
+.empty-state .btn-import .material-icons {
+    font-size: 18px;
+    margin: 0;
+    color: inherit;
+    opacity: 1;
+}
+
 
 /* Tab Content */
 .tab-content {
@@ -2195,6 +2208,84 @@ button .material-icons {
     color: var(--error-color);
 }
 
+/* Recurring transactions: badge of a row, series expected in the month */
+.recurring-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 8px;
+    padding: 1px 8px 1px 4px;
+    border-radius: 999px;
+    background: var(--background);
+    color: var(--primary-color);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.recurring-badge .material-icons {
+    font-size: 14px;
+}
+
+.recurring-expected {
+    padding: 12px 24px;
+    background: var(--background);
+    border-bottom: 1px solid var(--divider);
+}
+
+.recurring-expected h3 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.recurring-expected h3 .material-icons {
+    font-size: 18px;
+}
+
+.recurring-expected ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.recurring-expected li {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 4px 0;
+    font-size: 14px;
+}
+
+.recurring-expected-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-primary);
+}
+
+.recurring-expected-day {
+    color: var(--text-secondary);
+}
+
+.recurring-expected-amount {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.recurring-expected-amount.positive {
+    color: var(--success-color);
+}
+
+.recurring-expected-amount.negative {
+    color: var(--error-color);
+}
+
 /* On/off switch (unchecked transactions filter) */
 .toggle-switch {
     display: inline-flex;
@@ -3184,6 +3275,14 @@ button .material-icons {
 
 .sync-log li {
     padding: 1px 0;
+    overflow-wrap: anywhere;
+}
+
+/* Debug logs of woob (woob_debug): set apart without lowering the contrast */
+.sync-log li.sync-log-debug {
+    font-style: italic;
+    border-left: 2px solid var(--divider);
+    padding-left: 8px;
 }
 
 /* Synchronization steps */
@@ -3372,6 +3471,43 @@ button .material-icons {
     padding: 2px 6px;
     border-radius: var(--border-radius-sm);
     font-size: 12px;
+}
+
+.sync-step-message,
+.sync-2fa-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--border-radius-sm);
+    background: var(--info-light);
+    color: var(--info-color);
+    font-size: 12px;
+}
+
+.sync-step-message {
+    flex-basis: 100%;
+    margin-left: 28px;
+}
+
+.sync-2fa-hint {
+    margin: 0 0 10px;
+}
+
+.sync-2fa-help {
+    display: block;
+    margin-top: 6px;
+}
+
+.sync-2fa-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.account-2fa-button {
+    margin-top: 0;
 }
 
 .woob-issues-link {

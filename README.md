@@ -20,6 +20,7 @@
 
 <p align="center">
   <a href="https://github.com/ltoinel/Carbure/actions/workflows/ci.yml"><img src="https://github.com/ltoinel/Carbure/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/ltoinel/Carbure/actions/workflows/security.yml"><img src="https://github.com/ltoinel/Carbure/actions/workflows/security.yml/badge.svg?branch=main" alt="Security"></a>
   <a href="https://github.com/ltoinel/Carbure/releases"><img src="https://img.shields.io/github/v/release/ltoinel/Carbure" alt="Release"></a>
   <a href="https://hub.docker.com/r/ltoinel/carbure"><img src="https://img.shields.io/docker/pulls/ltoinel/carbure?logo=docker&logoColor=white" alt="Docker pulls"></a>
   <a href="https://github.com/ltoinel/Carbure/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-%E2%89%A5%2090%25-brightgreen" alt="Coverage"></a>
@@ -27,6 +28,10 @@
   <a href="https://mariadb.org/"><img src="https://img.shields.io/badge/MariaDB%20%2F%20MySQL-003545?logo=mariadb&logoColor=white" alt="MariaDB"></a>
   <a href="https://ltoinel.github.io/Carbure/"><img src="https://img.shields.io/badge/docs-GitHub%20Pages-EF4860" alt="Docs"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+</p>
+
+<p align="center">
+  <a href="https://ltoinel.github.io/Carbure/assets/videos/carbure-teaser.mp4"><img src="docs/assets/en/teaser-poster.jpg" alt="Watch the Carbure teaser (1 min, in French)" width="100%"></a>
 </p>
 
 <p align="center">
@@ -62,6 +67,8 @@
 - 📈 **Trends**: income, spending and savings over 3, 6 or 12 months, compared with the
   previous period or the same period last year.
 - ✅ **Check-off**: verify transactions in one click and filter those still to review.
+- 🔁 **Recurring transactions**: salary, rent, subscriptions and bills are spotted on their
+  own; see at a glance those still expected this month.
 - 🔔 **iPhone alerts**: a push after each sync, as soon as an expense exceeds the threshold
   you set, or when a rule you chose matches.
 - 📊 **Insights**: your own monthly indicators (groceries, fuel, subscriptions…).
@@ -162,3 +169,7 @@ The Docker image bundles third-party software, unmodified, under its own license
 
 Carbure calls woob as a separate program; it can be replaced by another woob version
 (virtual environment `/opt/woob`).
+
+The music of the [teaser](https://ltoinel.github.io/Carbure/assets/videos/carbure-teaser.mp4) is
+"Nowhere Land" by Kevin MacLeod ([incompetech.com](https://incompetech.com)), licensed
+under [Creative Commons: By Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).

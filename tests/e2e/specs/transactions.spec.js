@@ -66,11 +66,11 @@ test('searches the transactions of every month by label', async ({ adminPage: pa
 });
 
 test('filters the transactions not checked yet', async ({ adminPage: page }) => {
-    const toggle = page.locator('label.toggle-switch');
-    await expect(page.locator('.toggle-label')).toHaveText(tr('uncheckedCount', { count: 3 }));
+    const toggle = page.locator('.toggle-unchecked');
+    await expect(page.locator('.toggle-unchecked .toggle-label')).toHaveText(tr('uncheckedCount', { count: 3 }));
 
     await toggle.click();
-    await expect(page.getByRole('switch')).toBeChecked();
+    await expect(toggle.getByRole('switch')).toBeChecked();
     await expect(page.locator('.transaction-item')).toHaveCount(3);
 
     await toggle.click();
@@ -81,7 +81,7 @@ test('checks and unchecks a transaction', async ({ adminPage: page, api }) => {
     const transaction = row(page, 'CB SUPERMARCHE CASINO');
     await transaction.getByRole('button', { name: tr('checkTransaction') }).click();
     await expect(transaction.getByRole('button', { name: tr('uncheckTransaction') })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.locator('.toggle-label')).toHaveText(tr('uncheckedCount', { count: 2 }));
+    await expect(page.locator('.toggle-unchecked .toggle-label')).toHaveText(tr('uncheckedCount', { count: 2 }));
 
     const { month, year } = currentMonth();
     const saved = await (await api.get(`/api/transaction?month=${month}&year=${year}`)).json();
@@ -126,7 +126,8 @@ test('the category list of a row closes when the page scrolls, not on a late scr
     await page.evaluate(() => window.dispatchEvent(new Event('scroll')));
     await expect(search).toBeVisible();
 
-    await page.evaluate(() => window.scrollBy(0, 100));
+    // Towards where the page can scroll: the click may have scrolled it to the bottom
+    await page.evaluate(() => window.scrollBy(0, window.scrollY > 0 ? -100 : 100));
     await expect(search).toHaveCount(0);
 });
 
@@ -160,6 +161,22 @@ test('closes the detail modal with Escape', async ({ adminPage: page }) => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
+test('shows the recurring transactions of the month', async ({ adminPage: page }) => {
+    // Salary and rent: in each of the 3 months of the data set
+    const toggle = page.locator('.toggle-recurring');
+    await expect(toggle).toContainText(tr('recurringCount', { count: 2 }));
+    await expect(row(page, 'PRLV LOYER AGENCE').locator('.recurring-badge')).toBeVisible();
+    await expect(row(page, 'CB SUPERMARCHE CASINO').locator('.recurring-badge')).toHaveCount(0);
+
+    await toggle.click();
+    await expect(page.locator('.transaction-item')).toHaveCount(2);
+    await expect(row(page, 'VIR SALAIRE ACME')).toBeVisible();
+    await expect(row(page, 'PRLV LOYER AGENCE')).toBeVisible();
+
+    await toggle.click();
+    await expect(page.locator('.transaction-item')).toHaveCount(6);
+});
+
 test('imports a bank statement file', async ({ adminPage: page }) => {
     const day = d => {
         const date = new Date();
@@ -191,6 +208,37 @@ test('imports a bank statement file', async ({ adminPage: page }) => {
     await expect(modal).toHaveCount(0);
     await expect(row(page, 'CB FLEURISTE ROSE')).toHaveCount(2);
     await expect(page.locator('.transaction-item')).toHaveCount(8);
+});
+
+test('imports a statement file without any account to synchronize', async ({ adminPage: page }) => {
+    // No followed account anymore
+    await openTab(page, tr('tabAccounts'));
+    for (const bankId of ['00012345678@bnp', 'fail@bank']) {
+        const item = page.locator('.account-item').filter({ has: page.locator('code', { hasText: bankId }) });
+        await item.getByRole('button', { name: tr('deleteAccount') }).click();
+        await expect(item).toHaveCount(0);
+    }
+
+    // Empty month (as on a new installation): the import is offered by the empty state
+    await page.route('**/api/transaction?month=*', route => route.fulfill({ json: [] }));
+    await page.reload();
+    await expect(page.locator('.empty-state')).toContainText(tr('emptyImportHint'));
+    await page.locator('.empty-state').getByRole('button', { name: tr('importButton') }).click();
+    await page.unroute('**/api/transaction?month=*');
+
+    const modal = page.getByRole('dialog', { name: tr('importTitle') });
+    const csv = 'Date;Libellé;Montant\n15/03/2020;CB LIBRAIRIE;-18,90\n20/03/2020;VIR REMBOURSEMENT;40,00\n';
+    await modal.locator('input[type="file"]').setInputFiles({ name: 'releve.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await expect(modal.locator('.import-count.status-new strong')).toHaveText('2');
+    await modal.getByRole('button', { name: tr('importConfirm', { count: 2 }) }).click();
+
+    // The portal shows the month of the imported transactions
+    await expect(modal).toHaveCount(0);
+    await expect(row(page, 'CB LIBRAIRIE')).toHaveCount(1);
+    await expect(page.locator('.transaction-item')).toHaveCount(2);
+    // Other files are imported from the toolbar of the list
+    await expect(page.locator('.empty-state')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: tr('importButton') })).toBeVisible();
 });
 
 test('explains why a file cannot be imported', async ({ adminPage: page }) => {

@@ -43,6 +43,73 @@ class WoobTest extends TestCase
         Woob::getBankData('history', 'fail@bank');
     }
 
+    public function testTwoFactorAuthenticationNeedsTheInteractiveMode()
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('You have to run bank in interactive mode to perform a two-factor authentication');
+        Woob::getBankData('history', '2fa@bank');
+    }
+
+    public function testInteractiveModeRunsWoobOnATerminal()
+    {
+        $messages = [];
+        $data = Woob::getBankData('history', '2fa@bank', true, function ($message) use (&$messages) {
+            $messages[] = $message;
+        });
+
+        // The data is read as without terminal (no "\r\n"), the messages are given without colors
+        $this->assertCount(3, $data);
+        $this->assertSame('VIR SALAIRE', $data[2]['raw']);
+        $this->assertSame(['Veuillez valider la connexion dans votre application bancaire.', 'not json, ignored'], $messages);
+    }
+
+    public function testInteractiveModeKeepsTheExitCode()
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("exit code: 1): AttributeError: 'NoneType' object has no attribute 'iter_accounts'");
+        Woob::getBankData('history', 'fail@bank', true);
+    }
+
+    public function testDebugLogsAreGivenLiveWithWoobDebug()
+    {
+        $lines = [];
+        $onDebug = function ($line) use (&$lines) {
+            $lines[] = $line;
+        };
+
+        // Without woob_debug: nothing
+        Woob::getBankData('history', '123@bnp', false, null, $onDebug);
+        $this->assertSame([], $lines);
+
+        Config::set('woob_debug', true);
+        try {
+            $data = Woob::getBankData('history', '123@bnp', false, null, $onDebug);
+        } finally {
+            Config::set('woob_debug', false);
+        }
+
+        $this->assertCount(3, $data);
+        $this->assertSame(['DEBUG:woob.browser:Request: GET https://bank.example/accounts', 'DEBUG:woob.browser:Response: 200 OK'], $lines);
+    }
+
+    public function testDebugLogsKeepTheErrorOfAFailure()
+    {
+        $lines = [];
+        Config::set('woob_debug', true);
+        try {
+            Woob::getBankData('history', 'fail@bank', false, null, function ($line) use (&$lines) {
+                $lines[] = $line;
+            });
+            $this->fail('woob failed');
+        } catch (Exception $e) {
+            $this->assertStringContainsString('exit code: 1', $e->getMessage());
+        } finally {
+            Config::set('woob_debug', false);
+        }
+
+        $this->assertSame("AttributeError: 'NoneType' object has no attribute 'iter_accounts'", end($lines));
+    }
+
     public function testBankIdIsEscaped()
     {
         // Without escaping, the shell would run the injected command

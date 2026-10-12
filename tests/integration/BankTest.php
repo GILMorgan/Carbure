@@ -22,7 +22,7 @@ class BankTest extends DatabaseTestCase
         $accounts = Bank::get();
         // 111@bnp is followed twice (by two users): listed once
         $this->assertSame(['fail@bank', '111@bnp'], array_column($accounts, 'bankId'));
-        $this->assertSame(['bankId' => '111@bnp', 'account_number' => '111', 'bank_name' => 'bnp'],
+        $this->assertSame(['bankId' => '111@bnp', 'account_number' => '111', 'bank_name' => 'bnp', 'label' => null],
             array_diff_key($accounts[1], ['id' => true]));
         $this->assertGreaterThan(0, $accounts[1]['id']);
 
@@ -48,6 +48,32 @@ class BankTest extends DatabaseTestCase
 
         $this->assertTrue(Bank::delete($account['id']));
         $this->assertCount($before, Bank::accounts());
+    }
+
+    public function testLabel()
+    {
+        $this->loginAs(self::ADMIN);
+
+        // Trimmed, control characters replaced
+        $account = Bank::create('222', 'bnp', "  Compte\tjoint ");
+        $this->assertSame('Compte joint', $account['label']);
+        $listed = array_column(Bank::accounts(), 'label', 'bankId');
+        $this->assertSame('Compte joint', $listed['222@bnp']);
+        $this->assertSame('Compte joint', array_column(Bank::get(), 'label', 'bankId')['222@bnp']);
+
+        // Omitted (older clients): kept; empty: removed
+        $this->assertSame('Compte joint', Bank::update($account['id'], '222', 'bnp')['label']);
+        $this->assertSame('Livret A', Bank::update($account['id'], '222', 'bnp', 'Livret A')['label']);
+        $this->assertSame('Livret A', array_column(Bank::accounts(), 'label', 'bankId')['222@bnp']);
+        $this->assertNull(Bank::update($account['id'], '222', 'bnp', ' ')['label']);
+        $this->assertNull(array_column(Bank::accounts(), 'label', 'bankId')['222@bnp']);
+        $this->assertNull(Bank::create('333', 'bnp')['label']);
+
+        // 100 characters at most (accents count as one)
+        $this->assertSame(str_repeat('é', 100), Bank::update($account['id'], '222', 'bnp', str_repeat('é', 100))['label']);
+        $this->expectException(Error::class);
+        $this->expectExceptionCode(400);
+        Bank::update($account['id'], '222', 'bnp', str_repeat('é', 101));
     }
 
     public function testCreateDuplicateAndInvalid()
@@ -271,6 +297,96 @@ class BankTest extends DatabaseTestCase
         $this->expectException(Error::class);
         $this->expectExceptionCode(404);
         Bank::getSync(null, 'unknown@bnp');
+    }
+
+    public function testInteractiveSyncRelaysTheTwoFactorAuthentication()
+    {
+        Db::query("INSERT INTO bank_account (bank_name, account_number, user_id) VALUES ('bank', '2fa', " . self::ADMIN . ")");
+        $this->loginAs(self::ADMIN);
+
+        // Without the interactive mode, woob refuses to start the authentication
+        ob_start();
+        try {
+            Bank::getSync(null, '2fa@bank');
+        } finally {
+            $output = ob_get_clean();
+        }
+        $this->assertStringContainsString('data: Error syncing 2fa@bank: Error while calling woob (exit code: 1): Error(bank): You have to run bank in interactive mode', $output);
+
+        // The household is asked to approve the authentication in the portal
+        $alerts = array_map(fn($r) => $r['payload']['aps']['alert'], FakeApnsServer::requests());
+        $this->assertContains(['title' => 'Strong authentication needed', 'body' => 'Open Carbure (Accounts) to approve the connection to BANK'],
+            array_map(fn($a) => array_intersect_key($a, ['title' => 1, 'body' => 1]), $alerts));
+
+        ob_start();
+        try {
+            Bank::getSync(null, '2fa@bank', 'true');
+        } finally {
+            $output = ob_get_clean();
+        }
+        $this->assertStringContainsString('data: Bank message 2fa@bank: Veuillez valider la connexion dans votre application bancaire.', $output);
+        $this->assertStringContainsString('data: Done 2fa@bank (history): 3 received', $output);
+        $this->assertStringNotContainsString('Error syncing', $output);
+    }
+
+    public function testSyncSendsTheDebugLogsOfWoobToAnAdministrator()
+    {
+        Config::set('woob_debug', true);
+        try {
+            $this->loginAs(self::ADMIN);
+            $output = $this->sync();
+            $this->assertStringContainsString('data: Woob debug 111@bnp: DEBUG:woob.browser:Request: GET https://bank.example/accounts', $output);
+            $this->assertStringContainsString("data: Woob debug fail@bank: AttributeError: 'NoneType' object has no attribute 'iter_accounts'", $output);
+
+            // The debug logs may show bank data: not for the other users
+            $this->loginAs(self::USER);
+            $this->assertStringNotContainsString('Woob debug', $this->sync());
+        } finally {
+            Config::set('woob_debug', false);
+        }
+
+        // Disabled: no debug logs
+        $this->loginAs(self::ADMIN);
+        $this->assertStringNotContainsString('Woob debug', $this->sync());
+    }
+
+    public function testFailedSyncDoesNotUpdateTheCategories()
+    {
+        $this->loginAs(self::ADMIN);
+        ob_start();
+        try {
+            Bank::getSync(null, 'fail@bank');
+        } finally {
+            $output = ob_get_clean();
+        }
+        $this->assertStringContainsString('data: Error syncing fail@bank', $output);
+        $this->assertStringContainsString('data: Notifying users of fail@bank...', $output);
+        $this->assertStringNotContainsString('Updating missing categories', $output);
+        $this->assertStringContainsString('data: Synchronization complete', $output);
+
+        // One account synchronized: the categories are updated
+        $this->assertStringContainsString('data: Updating missing categories...', $this->sync());
+    }
+
+    public function testInteractiveSyncNeedsAUserAndOneAccount()
+    {
+        $this->loginAs(self::ADMIN);
+        try {
+            Bank::getSync(null, null, 'true');
+            $this->fail('All the accounts in interactive mode');
+        } catch (Error $e) {
+            $this->assertSame(400, $e->getCode());
+        }
+
+        // The scheduler (sync token, checked first) never starts a two-factor authentication
+        Config::set('sync_token', 'scheduler-secret');
+        try {
+            $this->expectException(Error::class);
+            $this->expectExceptionCode(400);
+            Bank::getSync('scheduler-secret', '111@bnp', 'true');
+        } finally {
+            Config::set('sync_token', '');
+        }
     }
 
     public function testSync()

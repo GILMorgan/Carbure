@@ -1,8 +1,8 @@
 // Accounts tab (administrators): followed bank accounts and synchronization (fake woob)
-const { test, expect, tr, openTab } = require('../fixtures');
+const { test, expect, tr, openTab, escapeRegExp } = require('../fixtures');
 
 /** Row of a followed account, by its bank id (account_number@bank) */
-const account = (page, bankId) => page.locator('.account-item').filter({ has: page.locator('code', { hasText: new RegExp(`^${bankId}$`) }) });
+const account = (page, bankId) => page.locator('.account-item').filter({ has: page.locator('code', { hasText: new RegExp(`^${escapeRegExp(bankId)}$`) }) });
 
 test('lists the followed accounts with their last synchronization', async ({ adminPage: page }) => {
     await openTab(page, tr('tabAccounts'));
@@ -35,6 +35,25 @@ test('synchronizes one account', async ({ adminPage: page }) => {
     await expect(page.locator('.transaction-item').filter({ hasText: 'BOULANGERIE' })).toHaveCount(2);
 });
 
+test('shows the debug logs of woob in the synchronization log', async ({ adminPage: page, api }) => {
+    const saved = await api.put('/api/system/config', { data: { values: { woob_debug: true } } });
+    expect(saved.ok(), await saved.text()).toBeTruthy();
+
+    await openTab(page, tr('tabAccounts'));
+    await account(page, 'fail@bank').getByRole('button', { name: tr('syncAccount') }).click();
+    await expect(page.locator('.sync-status')).toContainText(tr('syncStatus_error'));
+
+    // The error output of woob, line by line, besides the steps
+    await page.getByRole('button', { name: tr('syncShowLog') }).click();
+    const debug = page.locator('.sync-log li.sync-log-debug');
+    await expect(debug.filter({ hasText: 'Woob debug fail@bank: DEBUG:woob.browser:Request: GET https://bank.example/accounts' })).toHaveCount(1);
+    await expect(debug.last()).toHaveText("Woob debug fail@bank: AttributeError: 'NoneType' object has no attribute 'iter_accounts'");
+
+    // Nothing synchronized: no categorization, only the notification of the error
+    await expect(page.locator('.sync-log')).not.toContainText('Updating missing categories');
+    await expect(page.locator('.sync-log')).toContainText('Notifying users of fail@bank');
+});
+
 test('reports a synchronization error', async ({ adminPage: page }) => {
     await openTab(page, tr('tabAccounts'));
     await account(page, 'fail@bank').getByRole('button', { name: tr('syncAccount') }).click();
@@ -56,11 +75,69 @@ test('finds the accounts of a bank in woob and follows one', async ({ adminPage:
 
     await discovered.filter({ hasText: 'Livret A' }).getByRole('button', { name: tr('followAccount') }).click();
     await expect(modal.getByLabel(new RegExp(tr('accountNumber')))).toHaveValue('00087654321');
-    await expect(modal.getByLabel(new RegExp(tr('accountBank').replace(/[()]/g, '\\$&')))).toHaveValue('bnp');
+    await expect(modal.getByLabel(new RegExp(escapeRegExp(tr('accountBank'))))).toHaveValue('bnp');
+    // Named after its label in woob
+    await expect(modal.getByLabel(tr('accountLabel'))).toHaveValue('Livret A');
     await modal.getByRole('button', { name: tr('save') }).click();
 
     await expect(page.locator('.toast')).toHaveText(tr('accountAdded'));
-    await expect(account(page, '00087654321@bnp')).toBeVisible();
+    await expect(account(page, '00087654321@bnp').locator('.account-name')).toContainText('Livret A');
+});
+
+test('names an account, shown instead of the bank and the end of its number', async ({ adminPage: page }) => {
+    await openTab(page, tr('tabAccounts'));
+    const bnp = account(page, '00012345678@bnp');
+    await bnp.getByRole('button', { name: tr('editAccount') }).click();
+
+    let modal = page.getByRole('dialog', { name: tr('editAccount') });
+    await expect(modal.getByLabel(tr('accountLabel'))).toHaveValue('');
+    await modal.getByLabel(tr('accountLabel')).fill('Compte joint');
+    await modal.getByRole('button', { name: tr('save') }).click();
+    await expect(page.locator('.toast')).toHaveText(tr('accountUpdated'));
+    await expect(bnp.locator('.account-name')).toContainText('Compte joint');
+    await expect(bnp.locator('.account-name')).not.toContainText('BNP ···5678');
+
+    // Also in the synchronization progress
+    await bnp.getByRole('button', { name: tr('syncAccount') }).click();
+    await expect(page.locator('.sync-status')).toContainText(tr('syncStatus_success'));
+    await expect(page.locator('.sync-account-name')).toContainText('Compte joint');
+
+    // Emptied: back to the bank and the end of the number
+    await bnp.getByRole('button', { name: tr('editAccount') }).click();
+    modal = page.getByRole('dialog', { name: tr('editAccount') });
+    await expect(modal.getByLabel(tr('accountLabel'))).toHaveValue('Compte joint');
+    await modal.getByLabel(tr('accountLabel')).fill('');
+    await modal.getByRole('button', { name: tr('save') }).click();
+    await expect(page.locator('.toast')).toHaveText(tr('accountUpdated'));
+    await expect(bnp.locator('.account-name')).toContainText('BNP ···5678');
+});
+
+test('approves the strong authentication asked by a bank', async ({ adminPage: page }) => {
+    // Account of the fake woob that only answers in interactive mode (on a terminal)
+    await openTab(page, tr('tabAccounts'));
+    await page.getByRole('button', { name: tr('addAccountTitle') }).click();
+    const modal = page.getByRole('dialog', { name: tr('addAccountTitle') });
+    await modal.locator('#field-2').selectOption('__other');
+    await modal.getByPlaceholder(tr('accountBankPlaceholder')).fill('bank');
+    await modal.getByLabel(new RegExp(tr('accountNumber'))).fill('2fa');
+    await modal.getByRole('button', { name: tr('save') }).click();
+    await expect(page.locator('.toast')).toHaveText(tr('accountAdded'));
+
+    // A normal synchronization fails: woob needs the interactive mode
+    await account(page, '2fa@bank').getByRole('button', { name: tr('syncAccount') }).click();
+    await expect(page.locator('.sync-status')).toContainText(tr('syncStatus_error'));
+    await expect(page.locator('.sync-step-error')).toContainText(tr('sync2faHelp'));
+
+    // The account stays flagged (e.g. after a failed scheduled synchronization)
+    const row = account(page, '2fa@bank');
+    await expect(row.locator('.account-sync-state')).toHaveText(tr('lastSync2fa'));
+
+    await row.getByRole('button', { name: tr('sync2faButton') }).click();
+    await expect(page.locator('.sync-status')).toContainText(tr('syncStatus_success'));
+    await expect(page.getByRole('button', { name: tr('sync2faButton') })).toHaveCount(0);
+    await page.getByRole('button', { name: tr('syncShowLog') }).click();
+    await expect(page.locator('.sync-log')).toContainText('Bank message 2fa@bank: Veuillez valider la connexion dans votre application bancaire.');
+    await expect(account(page, '2fa@bank').locator('.account-sync-state')).toHaveText(tr('lastSync_OK'));
 });
 
 test('adds an account of a bank typed by hand, modifies then deletes it', async ({ adminPage: page }) => {

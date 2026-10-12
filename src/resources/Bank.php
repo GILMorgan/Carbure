@@ -23,12 +23,13 @@ final class Bank {
     /**
      * Get the bank accounts of the household (every user sees all of them).
      * Each bank account is returned with bankId = account_number@bank_name
-     * @return array List of bank accounts with bankId and details
+     * @return array List of bank accounts with bankId and details (label: name given to
+     *               the account, null if none)
      */
     #[ApiRoute('/bank', method: 'GET')]
     public static function get()
     {
-        $sql = "SELECT MIN(id) AS id, account_number, bank_name FROM bank_account
+        $sql = "SELECT MIN(id) AS id, account_number, bank_name, MAX(label) AS label FROM bank_account
                 GROUP BY account_number, bank_name ORDER BY bank_name, account_number";
         $stmt = Db::execute($sql, "");
         $result = $stmt->get_result();
@@ -40,7 +41,8 @@ final class Bank {
                     'id' => $row['id'],
                     'bankId' => $row['account_number'] . '@' . $row['bank_name'],
                     'account_number' => $row['account_number'],
-                    'bank_name' => $row['bank_name']
+                    'bank_name' => $row['bank_name'],
+                    'label' => $row['label']
                 );
             }
         }
@@ -67,6 +69,26 @@ final class Bank {
     }
 
     /**
+     * Normalize the name given to an account: trimmed, without control characters,
+     * null when empty.
+     *
+     * @param string|null $label The name given to the account
+     * @return string|null The name to store
+     * @throws Error If it is too long
+     */
+    private static function normalizeLabel($label)
+    {
+        $label = trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', (string)$label) ?? '');
+        if ($label === '') {
+            return null;
+        }
+        if (mb_strlen($label) > 100) {
+            throw new Error("Account name too long (100 characters max)", 400);
+        }
+        return $label;
+    }
+
+    /**
      * Get a bank account of the household.
      *
      * @param int $id The account id
@@ -86,15 +108,15 @@ final class Bank {
      * All the bank accounts of the household with the user who added them and the
      * result of their last synchronization (administrators).
      *
-     * @return array The accounts: id, bankId, account_number, bank_name, user_id and
-     *               username (who added it),
+     * @return array The accounts: id, bankId, account_number, bank_name, label (name
+     *               given to the account, null if none), user_id and username (who added it),
      *               last_sync_at, last_sync_status (OK|ERROR), last_sync_message
      */
     #[ApiRoute('/bank/accounts', method: 'GET')]
     public static function accounts()
     {
         User::requireAdmin();
-        $sql = "SELECT a.id, a.account_number, a.bank_name, a.user_id, u.username,
+        $sql = "SELECT a.id, a.account_number, a.bank_name, a.label, a.user_id, u.username,
                        a.last_sync_at, a.last_sync_status, a.last_sync_message
                 FROM bank_account a JOIN users u ON u.id = a.user_id
                 ORDER BY a.bank_name, a.account_number, u.username";
@@ -108,51 +130,56 @@ final class Bank {
     /**
      * Follow a bank account (it is synchronized from now on).
      *
-     * @param string $account_number The account identifier in woob
-     * @param string $bank_name      The woob backend name
+     * @param string      $account_number The account identifier in woob
+     * @param string      $bank_name      The woob backend name
+     * @param string|null $label          Name given to the account (optional)
      * @return array The account (user_id: the administrator who added it)
      * @throws Error If invalid or already followed by the household
      */
     #[ApiRoute('/bank', method: 'POST')]
-    public static function create($account_number, $bank_name)
+    public static function create($account_number, $bank_name, $label = null)
     {
         User::requireAdmin();
         self::validateAccount($account_number, $bank_name);
+        $label = self::normalizeLabel($label);
         $userId = (int)Jwt::getUserIdFromToken();
 
         if (Db::queryOne("SELECT id FROM bank_account WHERE account_number = ? AND bank_name = ?", "ss", $account_number, $bank_name)) {
             throw new \Error("This account is already followed", 409);
         }
 
-        $stmt = Db::execute("INSERT INTO bank_account (bank_name, account_number, user_id) VALUES (?, ?, ?)", "ssi", $bank_name, $account_number, $userId);
+        $stmt = Db::execute("INSERT INTO bank_account (bank_name, account_number, label, user_id) VALUES (?, ?, ?, ?)", "sssi", $bank_name, $account_number, $label, $userId);
 
-        return ['id' => $stmt->insert_id, 'bankId' => "$account_number@$bank_name", 'account_number' => $account_number, 'bank_name' => $bank_name, 'user_id' => $userId];
+        return ['id' => $stmt->insert_id, 'bankId' => "$account_number@$bank_name", 'account_number' => $account_number, 'bank_name' => $bank_name, 'label' => $label, 'user_id' => $userId];
     }
 
     /**
      * Modify a followed bank account.
      *
-     * @param int    $id             The account id
-     * @param string $account_number The account identifier in woob
-     * @param string $bank_name      The woob backend name
+     * @param int         $id             The account id
+     * @param string      $account_number The account identifier in woob
+     * @param string      $bank_name      The woob backend name
+     * @param string|null $label          Name given to the account: omitted (null) keeps
+     *                                    the current one, empty removes it
      * @return array The account
      * @throws Error If not found, invalid or already followed by the household
      */
     #[ApiRoute('/bank', method: 'PUT')]
-    public static function update($id, $account_number, $bank_name)
+    public static function update($id, $account_number, $bank_name, $label = null)
     {
         User::requireAdmin();
         $account = self::existingAccount($id);
         self::validateAccount($account_number, $bank_name);
+        $label = $label === null ? $account['label'] : self::normalizeLabel($label);
         $userId = (int)$account['user_id'];
 
         if (Db::queryOne("SELECT id FROM bank_account WHERE account_number = ? AND bank_name = ? AND id <> ?", "ssi", $account_number, $bank_name, $id)) {
             throw new \Error("This account is already followed", 409);
         }
 
-        Db::execute("UPDATE bank_account SET account_number = ?, bank_name = ? WHERE id = ?", "ssi", $account_number, $bank_name, $id);
+        Db::execute("UPDATE bank_account SET account_number = ?, bank_name = ?, label = ? WHERE id = ?", "sssi", $account_number, $bank_name, $label, $id);
 
-        return ['id' => (int)$id, 'bankId' => "$account_number@$bank_name", 'account_number' => $account_number, 'bank_name' => $bank_name, 'user_id' => $userId];
+        return ['id' => (int)$id, 'bankId' => "$account_number@$bank_name", 'account_number' => $account_number, 'bank_name' => $bank_name, 'label' => $label, 'user_id' => $userId];
     }
 
     /**
@@ -315,13 +342,15 @@ final class Bank {
      * Save the transactions of a bank account: coming (card transactions not debited
      * yet, type 12) or history.
      *
-     * @param string $kind   "coming" or "history"
-     * @param string $bankId The bank id to sync (account_number@bank_name)
+     * @param string $kind        "coming" or "history"
+     * @param string $bankId      The bank id to sync (account_number@bank_name)
+     * @param bool   $interactive Allow the bank to ask a two-factor authentication
+     * @param bool   $debug       Send the debug logs of woob (woob_debug) in the progress
      * @return array The new transactions
      */
-    private static function syncBankData($kind, $bankId)
+    private static function syncBankData($kind, $bankId, $interactive = false, $debug = false)
     {
-        $transactions = self::getBankData($kind, $bankId);
+        $transactions = self::getBankData($kind, $bankId, $interactive, $debug);
         if (empty($transactions)) {
             Logger::warn("No $kind transactions for $bankId");
             Webservice::sendProgress("Done $bankId ($kind): 0 received, 0 new");
@@ -344,7 +373,7 @@ final class Bank {
      * (X-Sync-Token header or ?token= parameter).
      *
      * @param string|null $token The sync token passed as query parameter
-     * @return void
+     * @return bool True for an authenticated user, false for the scheduler
      * @throws Error If the caller is not allowed
      */
     private static function checkSyncAccess($token)
@@ -352,11 +381,11 @@ final class Bank {
         $token = Webservice::getHeader('X-Sync-Token') ?? $token;
 
         if ($token !== null && Config::has('sync_token') && hash_equals((string)Config::get('sync_token'), (string)$token)) {
-            return;
+            return false;
         }
 
         if (Jwt::checkAuthorization()) {
-            return;
+            return true;
         }
 
         throw new \Error("Unauthorized - Invalid or missing JWT token or sync token", 401);
@@ -365,15 +394,33 @@ final class Bank {
     /**
      * Synchronize the bank data with Server-Sent Events progress.
      *
-     * @param string|null $token   The sync token (for the scheduler)
-     * @param string|null $account Synchronize only this account (account_number@bank_name)
+     * In interactive mode (a user in the portal, one account), woob may start a
+     * two-factor authentication: its messages ("validate in your bank app") are sent
+     * as "Bank message <account>: <message>" while it waits for the validation.
+     *
+     * With woob_debug enabled, an administrator also receives the debug logs of woob
+     * (error output) as "Woob debug <account>: <line>", to diagnose a failing bank.
+     *
+     * The missing categories are only updated when at least one account was synchronized:
+     * after a failure, only the users are notified of the error.
+     *
+     * @param string|null $token       The sync token (for the scheduler)
+     * @param string|null $account     Synchronize only this account (account_number@bank_name)
+     * @param string|null $interactive "true": allow a two-factor authentication (needs $account)
      * @return void
-     * @throws Error If unauthorized or the account is not followed
+     * @throws Error If unauthorized, the account is not followed or the interactive mode not allowed
      */
     #[ApiRoute('/bank/sync', method: 'GET', public: true, stream: true)]
-    public static function getSync($token = null, $account = null)
+    public static function getSync($token = null, $account = null, $interactive = null)
     {
-        self::checkSyncAccess($token);
+        $user = self::checkSyncAccess($token);
+
+        // A two-factor authentication is only started for a user who waits for it
+        // (never by the scheduler), on one account
+        $interactive = filter_var($interactive, FILTER_VALIDATE_BOOLEAN);
+        if ($interactive && (!$user || $account === null || $account === '')) {
+            throw new Error("The interactive mode needs a user and one account", 400);
+        }
 
         $bankIds = self::getBankIds();
         if ($account !== null && $account !== '') {
@@ -386,6 +433,9 @@ final class Bank {
         // Allow unlimited execution time for bank sync
         set_time_limit(0);
 
+        // The debug logs of woob may show bank data: only for an administrator
+        $debug = $user && Config::get('woob_debug') && User::isAdmin();
+
         // Acquire exclusive lock to prevent concurrent syncs
         $lockAcquired = Db::query("SELECT GET_LOCK('bank_sync', 0) AS locked")->fetch_assoc()['locked'];
         if (!$lockAcquired) {
@@ -394,6 +444,9 @@ final class Bank {
         }
 
         try {
+            // At least one account synchronized: the transactions may need categories
+            $synced = false;
+
             // Synchronize each bank account
             foreach ($bankIds as $bankId) {
                 
@@ -403,10 +456,10 @@ final class Bank {
 
                 try {
                     Webservice::sendProgress("Syncing $bankId (coming)...");
-                    $created = self::syncBankData('coming', $bankId);
+                    $created = self::syncBankData('coming', $bankId, $interactive, $debug);
 
                     Webservice::sendProgress("Syncing $bankId (history)...");
-                    $created = array_merge($created, self::syncBankData('history', $bankId));
+                    $created = array_merge($created, self::syncBankData('history', $bankId, $interactive, $debug));
 
                 } catch (Exception $e) {
                     Logger::error("Error syncing $bankId: " . $e->getMessage());
@@ -415,17 +468,20 @@ final class Bank {
                     $error = $e->getMessage();
                 }
                 self::recordSyncResult($bankId, $status, $status ? count($created) . " new" : $error);
+                $synced = $synced || $status;
 
                 // Send notification to all users who own this bank account
                 Webservice::sendProgress("Notifying users of $bankId...");
-                self::notifyBankUsers($bankId, $status);
+                self::notifyBankUsers($bankId, $status, $error);
                 self::alertLargeExpenses($bankId, $created);
                 self::alertRuleMatches($created);
             }
             
-            // Update missing categories
-            Webservice::sendProgress("Updating missing categories...");
-            Transaction::updateMissingCategories();
+            // Update missing categories: useless when every account failed (no transaction)
+            if ($synced) {
+                Webservice::sendProgress("Updating missing categories...");
+                Transaction::updateMissingCategories();
+            }
 
             // Delete the log files older than the retention: a cleanup must not fail the sync
             try {
@@ -504,11 +560,14 @@ final class Bank {
     /**
      * Send notification to all users who own a specific bank account.
      *
-     * @param string $bankId The bank ID (account_number@bank_name)
-     * @param bool   $status The sync status (true=success, false=failure)
+     * A failure that needs a two-factor authentication asks to approve it in the portal.
+     *
+     * @param string      $bankId The bank ID (account_number@bank_name)
+     * @param bool        $status The sync status (true=success, false=failure)
+     * @param string|null $error  The error of a failed synchronization
      * @return void
      */
-        public static function notifyBankUsers($bankId, $status)
+        public static function notifyBankUsers($bankId, $status, $error = null)
     {
         // Parse bankId to extract account_number and bank_name
         list($accountNumber, $bankName) = explode('@', $bankId, 2);
@@ -526,7 +585,10 @@ final class Bank {
                 $unpointed = Transaction::countUnpointed();
 
                 // Determine notification message based on sync status
-                if ($status === false) {
+                if ($status === false && Woob::needsTwoFactor($error)) {
+                    $message = "Strong authentication needed";
+                    $description = "Open Carbure (Accounts) to approve the connection to " . strtoupper($bankName);
+                } elseif ($status === false) {
                     $message = "Bank synchronization failed !";
                     $description = "$unpointed transactions to review";
                 } else {
@@ -643,12 +705,16 @@ final class Bank {
     /**
      * Call Woob to get the list of transactions from a bank.
      *
-     * @param string $type   The type of transactions to get (coming or history)
-     * @param string $bankId The bank id
+     * @param string $type        The type of transactions to get (coming or history)
+     * @param string $bankId      The bank id
+     * @param bool   $interactive Allow the bank to ask a two-factor authentication
+     * @param bool   $debug       Send the debug logs of woob in the progress
      * @return array|null The transaction data or null if no data
      */
-    private static function getBankData($type, $bankId)
+    private static function getBankData($type, $bankId, $interactive = false, $debug = false)
     {
-        return Woob::getBankData($type, $bankId);
+        return Woob::getBankData($type, $bankId, $interactive,
+            fn($message) => Webservice::sendProgress("Bank message $bankId: $message"),
+            $debug ? fn($line) => Webservice::sendProgress("Woob debug $bankId: $line") : null);
     }
 }

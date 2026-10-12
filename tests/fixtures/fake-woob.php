@@ -13,7 +13,10 @@
  * - account "empty@bank" : no output
  * - account "broken@bank": no output, error on stderr, exit code 0 (module not loaded)
  * - account "slow@bank"  : waits 2 seconds before answering
+ * - account "2fa@bank"   : asks a two-factor authentication, only possible when the output
+ *                          is a terminal (like woob); otherwise fails with code 1
  * - other accounts       : one JSON array of transactions per line, like woob -f json
+ * - with --debug          : the bank commands also write debug logs on stderr, like woob
  */
 
 $type = $argv[2] ?? '';
@@ -114,6 +117,11 @@ if (($argv[1] ?? '') === 'bank' && $type === 'list') {
     exit(0);
 }
 
+if (($argv[1] ?? '') === 'bank' && in_array('--debug', $argv, true)) {
+    fwrite(STDERR, "DEBUG:woob.browser:Request: GET https://bank.example/accounts\n");
+    fwrite(STDERR, "DEBUG:woob.browser:Response: 200 OK\n");
+}
+
 if ($account === 'fail@bank') {
     fwrite(STDERR, "AttributeError: 'NoneType' object has no attribute 'iter_accounts'\n");
     exit(1);
@@ -126,6 +134,15 @@ if ($account === 'empty@bank') {
 if ($account === 'broken@bank') {
     fwrite(STDERR, "Error(bnp): Unable to load module \"bnp\": No module named 'curl_cffi'\n");
     exit(0);
+}
+
+if ($account === '2fa@bank') {
+    if (!stream_isatty(STDOUT)) {
+        fwrite(STDERR, "Error(bank): You have to run bank in interactive mode to perform a two-factor authentication\n");
+        exit(1);
+    }
+    // Message of a DecoupledValidation, then the data once validated
+    echo "\e[1mVeuillez valider la connexion dans votre application bancaire.\e[0m\n";
 }
 
 if ($account === 'slow@bank') {

@@ -123,29 +123,30 @@ l'a ajouté.
 ### `GET /bank`
 
 Comptes bancaires du foyer, visibles par tous les utilisateurs (un compte n'apparaît
-qu'une fois) :
+qu'une fois) ; `label` est le nom donné au compte (`null` s'il n'en a pas) :
 
 ```json
-[{ "id": 1, "bankId": "12345678@bnp", "account_number": "12345678", "bank_name": "bnp" }]
+[{ "id": 1, "bankId": "12345678@bnp", "account_number": "12345678", "bank_name": "bnp", "label": "Compte joint" }]
 ```
 
 ### `GET /bank/accounts` — administrateur
 
 Tous les comptes du foyer avec l'utilisateur qui les a ajoutés et le résultat de leur
-dernière synchronisation : `id`, `bankId`, `account_number`, `bank_name`, `user_id` et
+dernière synchronisation : `id`, `bankId`, `account_number`, `bank_name`, `label`, `user_id` et
 `username` (qui l'a ajouté), `last_sync_at`, `last_sync_status` (`OK`, `ERROR` ou `null`),
 `last_sync_message` (nombre de nouvelles transactions ou erreur).
 
 ### `POST /bank` — administrateur
 
 Suit un compte pour le foyer. Paramètres : `account_number` (identifiant du compte dans
-woob) et `bank_name` (nom du backend woob) ; `user_id` du compte est l'administrateur qui
-l'ajoute. `409` si le foyer suit déjà ce compte, `400` si un identifiant est invalide.
+woob), `bank_name` (nom du backend woob) et `label` (facultatif : nom donné au compte,
+100 caractères maximum) ; `user_id` du compte est l'administrateur qui l'ajoute. `409` si le foyer suit déjà ce compte, `400` si un identifiant est invalide.
 
 ### `PUT /bank` — administrateur
 
-Modifie un compte suivi : `id`, `account_number`, `bank_name` (`404` si inconnu, `409` si
-le foyer suit déjà le compte visé).
+Modifie un compte suivi : `id`, `account_number`, `bank_name` et `label` (facultatif :
+absent, le nom actuel est conservé ; vide, il est supprimé). `404` si inconnu, `409` si le
+foyer suit déjà le compte visé.
 
 ### `DELETE /bank?id=` — administrateur
 
@@ -187,7 +188,14 @@ sont enregistrés pour chaque compte. Accès autorisé avec :
 - le `sync_token` de la configuration, dans l'en-tête `X-Sync-Token` ou le paramètre
   `?token=` ;
 
-`401` sinon. La réponse est un flux `text/event-stream` : messages `data: …` (progression,
+`401` sinon. `?interactive=true` (avec `account`, pour un utilisateur connecté seulement,
+`400` sinon) autorise woob à déclencher une authentification forte : woob est lancé sur un
+pseudo-terminal (`tools/woob-tty.py`) et ses messages sont relayés en
+`data: Bank message <compte>: <message>` pendant qu'il attend la validation dans
+l'application de la banque. Sans ce paramètre, une banque qui exige une authentification
+forte échoue avec `…interactive mode to perform a two-factor authentication`.
+
+La réponse est un flux `text/event-stream` : messages `data: …` (progression,
 résultat de chaque étape) et commentaires `: heartbeat` toutes les 15 s pendant
 l'exécution de woob. Une seule synchronisation peut tourner à la fois (sinon :
 `data: Synchronization already in progress`).
@@ -236,6 +244,30 @@ Types : 1 virement, 2 prélèvement, 3 chèque, 4 remise de chèque, 5 rembourse
 
 Mois qui ont des transactions, du plus récent au plus ancien : `[{"year": 2026, "month": 10}, …]`.
 Le portail en tire les listes de mois et d'années.
+
+### `GET /transaction/recurring`
+
+Transactions récurrentes d'un mois : retrouvées environ une fois par mois vers le même jour
+(salaire, loyer, abonnements, factures). Une série regroupe les transactions de même sens
+(débit ou crédit) dont le libellé, chiffres retirés (références, dates), est le même. Elle
+est récurrente si elle apparaît dans 3 mois au moins de la période, 1,5 fois par mois au
+plus, 3 fois sur 4 à 5 jours près du même jour, et encore active (vue dans le mois ou le
+mois précédent). Un paiement par carte doit en plus garder le même montant à 20 % près
+(un abonnement, pas le restaurant) ; un prélèvement ou un virement peut varier.
+
+| Paramètre | Requis | Description |
+|---|---|---|
+| `month`, `year` | non | Mois (mois courant par défaut) |
+| `months` | non | Nombre de mois précédents examinés (2 à 24, défaut 6) |
+
+Réponse, triée par jour : `[{"label", "category", "amount" (dernier montant), "average",
+"variable" (montant changeant de plus de 10 %), "day" (jour habituel), "months" (nombre de
+mois où elle apparaît), "last" (date de la dernière), "ids" (ses transactions du mois),
+"status"}]`. `status` vaut `received`, ou `expected` si elle n'est pas encore dans le mois.
+
+```bash
+curl "https://exemple.fr/api/transaction/recurring?month=10&year=2026" -H "Authorization: Bearer $TOKEN"
+```
 
 ### `GET /transaction/search`
 
