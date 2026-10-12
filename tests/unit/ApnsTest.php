@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\Apns;
+use ltoinel\lib\Config;
 
 class ApnsTest extends TestCase
 {
@@ -56,7 +58,7 @@ class ApnsTest extends TestCase
 
         $this->assertSame(str_repeat("\xff", 32) . "\x00" . str_repeat("\x01", 31), Apns::derToRaw($der));
 
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         Apns::derToRaw('not a signature');
     }
 
@@ -87,7 +89,7 @@ class ApnsTest extends TestCase
 
     public function testInvalidTokenFormat()
     {
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         Apns::send('not-a-token', 'Title', 'Body');
     }
 
@@ -103,7 +105,7 @@ class ApnsTest extends TestCase
     public function testIncompleteTokenConfiguration()
     {
         Config::set('apns_key_id', '');
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('configuration incomplete');
         Apns::send(self::TOKEN, 'Title', 'Body');
     }
@@ -111,7 +113,7 @@ class ApnsTest extends TestCase
     public function testMissingKeyFile()
     {
         Config::set('apns_key_path', '/does/not/exist.p8');
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('key file not found');
         Apns::send(self::TOKEN, 'Title', 'Body');
     }
@@ -122,7 +124,7 @@ class ApnsTest extends TestCase
         file_put_contents($file, 'not a key');
         Config::set('apns_key_path', $file);
 
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Invalid APNs private key');
         Apns::send(self::TOKEN, 'Title', 'Body');
     }
@@ -130,7 +132,7 @@ class ApnsTest extends TestCase
     public function testMissingBundleId()
     {
         Config::set('apns_bundle_id', '');
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         Apns::send(self::TOKEN, 'Title', 'Body');
     }
 
@@ -153,7 +155,7 @@ class ApnsTest extends TestCase
         Config::set('apns_auth_method', 'certificate');
         Config::set('apns_certificate_path', '/does/not/exist.pem');
 
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         Apns::send(self::TOKEN, 'Title', 'Body');
     }
 
@@ -162,7 +164,7 @@ class ApnsTest extends TestCase
         Config::set('apns_auth_method', 'certificate');
         Config::set('apns_certificate_path', '');
 
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         Apns::send(self::TOKEN, 'Title', 'Body');
     }
 
@@ -170,7 +172,7 @@ class ApnsTest extends TestCase
     {
         Config::set('apns_endpoint', 'http://127.0.0.1:1');
 
-        $this->expectException(Error::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Failed to send APNs notification');
         try {
             Apns::send(self::TOKEN, 'Title', 'Body');

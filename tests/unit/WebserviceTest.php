@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\Logger;
+use ltoinel\lib\Webservice;
 
 /**
  * Fake resource used to test the service dispatch.

@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\Config;
+use ltoinel\lib\Logger;
 
 class LoggerTest extends TestCase
 {

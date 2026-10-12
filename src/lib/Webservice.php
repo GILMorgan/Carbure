@@ -2,7 +2,9 @@
 
 namespace ltoinel\lib;
 
+use ltoinel\lib\Logger;
 use Error;
+use Exception;
 
 /**
  * Webservice.php

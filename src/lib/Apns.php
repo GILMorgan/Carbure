@@ -10,6 +10,10 @@
  * @copyright  2026 Carbure App
  */
 
+namespace ltoinel\lib;
+
+use Error;
+
 final class Apns {
 
     /**

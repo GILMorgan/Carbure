@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\Config;
 
 class ConfigTest extends TestCase
 {
@@ -11,7 +12,7 @@ class ConfigTest extends TestCase
 
     public function testGetThrowsOnMissingSetting()
     {
-        $this->expectException(Exception::class);
+        $this->expectException(\Exception::class);
         Config::get('this_setting_does_not_exist');
     }
 
@@ -28,7 +29,7 @@ class ConfigTest extends TestCase
 
     public function testLoadMissingEnvironment()
     {
-        $this->expectException(Exception::class);
+        $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Config file not found');
         Config::load('does-not-exist');
     }

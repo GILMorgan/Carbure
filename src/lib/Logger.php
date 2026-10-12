@@ -1,9 +1,5 @@
 <?php
 
-namespace ltoinel\lib;
-
-use \DateTimeImmutable;
-
 /**
  * Logger.php
  *
@@ -14,6 +10,11 @@ use \DateTimeImmutable;
  * @author     Ludovic Toinel
  * @copyright  2026 Carbure App
  */
+
+namespace ltoinel\lib;
+
+use ltoinel\lib\Logger;
+use \DateTimeImmutable;
 
 final class Logger {
 

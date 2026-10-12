@@ -6,6 +6,9 @@
  * Starts tests/fixtures/fake-apns.php with the PHP built-in web server
  * and configures Carbure to send its notifications to it.
  */
+
+use ltoinel\lib\Config;
+
 final class FakeApnsServer
 {
     private static $process = null;

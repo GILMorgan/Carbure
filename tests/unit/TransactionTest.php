@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\resources\Transaction;
 
 class TransactionTest extends TestCase
 {

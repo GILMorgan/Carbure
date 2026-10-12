@@ -14,6 +14,8 @@
  * @copyright  2026 Carbure App
  */
 
+use ltoinel\lib\Config;
+
 require_once __DIR__ . '/../src/autoload.php';
 require_once __DIR__ . '/FakeApnsServer.php';
 require_once __DIR__ . '/integration/DatabaseTestCase.php';

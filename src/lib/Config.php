@@ -1,7 +1,5 @@
 <?php
 
-namespace ltoinel\lib;
-
 /**
  * Config.php
  *
@@ -10,6 +8,9 @@ namespace ltoinel\lib;
  * @author     Ludovic Toinel
  * @copyright  2026 Carbure App
  */
+namespace ltoinel\lib;
+
+use \Exception;
 
 final class Config {
 

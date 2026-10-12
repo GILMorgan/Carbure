@@ -20,6 +20,8 @@
  * @copyright  2026 Carbure App
  */
 
+namespace ltoinel\lib;
+
 final class Setup {
 
     private string $root;

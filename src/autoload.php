@@ -11,10 +11,11 @@ use ltoinel\lib\Config;
  * @copyright  2026 Carbure App
  */
 
+
 spl_autoload_register(
     function ($className) {
-        $file = str_replace(["ltoinel\\", "\\"], ["/", "/"], $className) . ".php";
-        require_once __DIR__ . $file;      
+        $file = str_replace(["ltoinel", "\\"], ["", "/"], $className) . ".php";
+        @require_once __DIR__ . $file;      
     }
 );
 

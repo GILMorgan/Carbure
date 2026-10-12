@@ -1,7 +1,5 @@
 <?php
 
-namespace ltoinel\lib;
-
 /**
  * Jwt.php
  *
@@ -10,6 +8,10 @@ namespace ltoinel\lib;
  * @author     Ludovic Toinel
  * @copyright  2026 Carbure App
  */
+
+namespace ltoinel\lib;
+
+use DateTime;
 
 final class Jwt {
 

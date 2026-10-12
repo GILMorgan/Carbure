@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\Month;
 
 class MonthTest extends TestCase
 {

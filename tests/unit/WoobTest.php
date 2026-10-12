@@ -1,6 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\Config;
+use ltoinel\lib\Woob;
 
 class WoobTest extends TestCase
 {
@@ -29,14 +31,14 @@ class WoobTest extends TestCase
 
     public function testErrorWithoutDataThrows()
     {
-        $this->expectException(Exception::class);
+        $this->expectException(\Exception::class);
         $this->expectExceptionMessage("woob returned no data: Error(bnp): Unable to load module \"bnp\": No module named 'curl_cffi'");
         Woob::getBankData('history', 'broken@bank');
     }
 
     public function testFailureThrows()
     {
-        $this->expectException(Exception::class);
+        $this->expectException(\Exception::class);
         $this->expectExceptionMessage("exit code: 1): AttributeError: 'NoneType' object has no attribute 'iter_accounts'");
         Woob::getBankData('history', 'fail@bank');
     }

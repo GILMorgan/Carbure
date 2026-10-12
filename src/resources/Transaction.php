@@ -24,11 +24,10 @@
 namespace ltoinel\resources;
 
 use ltoinel\lib\ApiRoute;
+use ltoinel\lib\Config;
 use ltoinel\lib\Db;
 use ltoinel\lib\Jwt;
 use ltoinel\lib\Month;
-
-require_once "Category.php";
 
 final class Transaction {
 

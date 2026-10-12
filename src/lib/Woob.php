@@ -11,6 +11,8 @@
 
 namespace ltoinel\lib;
 
+use \Exception;
+
 final class Woob {
 
     /**

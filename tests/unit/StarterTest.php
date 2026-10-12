@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\resources\Insight;
 
 /**
  * Starter data offered by the installation wizard (sql/starter.json).

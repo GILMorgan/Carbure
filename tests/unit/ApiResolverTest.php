@@ -1,6 +1,9 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\ApiResolver;
+use ltoinel\lib\ApiRoute;
+use ltoinel\lib\ApiToken;
 
 class ApiResolverTest extends TestCase
 {
@@ -37,7 +40,7 @@ class ApiResolverTest extends TestCase
     {
         $public = [];
         foreach (glob(__DIR__ . '/../../src/resources/*.php') as $file) {
-            $class = new ReflectionClass(basename($file, '.php'));
+            $class = new ReflectionClass("ltoinel\\resources\\" . basename($file, '.php'));
             foreach ($class->getMethods() as $method) {
                 foreach ($method->getAttributes(ApiRoute::class) as $attribute) {
                     $route = $attribute->newInstance();

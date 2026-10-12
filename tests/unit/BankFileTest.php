@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use ltoinel\lib\BankFile;
 
 class BankFileTest extends TestCase
 {
