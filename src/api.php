@@ -1,7 +1,7 @@
 <?php
 
-use ltoinel\lib\Logger;
-use ltoinel\lib\Webservice;
+use Carbure\lib\Logger;
+use Carbure\lib\Webservice;
 
 ini_set("display_errors", true);
 

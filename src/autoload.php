@@ -1,6 +1,6 @@
 <?php
 
-use ltoinel\lib\Config;
+use Carbure\lib\Config;
 
 /**
  * autoload.php
@@ -11,12 +11,6 @@ use ltoinel\lib\Config;
  * @copyright  2026 Carbure App
  */
 
-
-spl_autoload_register(
-    function ($className) {
-        $file = str_replace(["ltoinel", "\\"], ["", "/"], $className) . ".php";
-        @require_once __DIR__ . $file;      
-    }
-);
+require_once preg_replace("/src/", "vendor/autoload.php", __DIR__);
 
 Config::load(getenv('APP_ENV') ?: 'prod');

@@ -1,6 +1,6 @@
 <?php
 
-namespace ltoinel\lib;
+namespace Carbure\lib;
 
 use mysqli;
 

@@ -1,9 +1,10 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\ApiResolver;
-use ltoinel\lib\ApiRoute;
-use ltoinel\lib\ApiToken;
+use Carbure\lib\ApiResolver;
+use Carbure\lib\ApiRoute;
+use Carbure\lib\ApiToken;
+use Carbure\resources\User;
 
 class ApiResolverTest extends TestCase
 {
@@ -11,7 +12,7 @@ class ApiResolverTest extends TestCase
     {
         $route = ApiResolver::findRoute('/user/login', 'POST');
 
-        $this->assertSame('User', $route['class']);
+        $this->assertSame(User::class, $route['class']);
         $this->assertSame('login', $route['method']);
         $this->assertTrue($route['apiRoute']->public);
     }
@@ -40,7 +41,7 @@ class ApiResolverTest extends TestCase
     {
         $public = [];
         foreach (glob(__DIR__ . '/../../src/resources/*.php') as $file) {
-            $class = new ReflectionClass("ltoinel\\resources\\" . basename($file, '.php'));
+            $class = new ReflectionClass("Carbure\\resources\\" . basename($file, '.php'));
             foreach ($class->getMethods() as $method) {
                 foreach ($method->getAttributes(ApiRoute::class) as $attribute) {
                     $route = $attribute->newInstance();

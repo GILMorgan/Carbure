@@ -7,7 +7,7 @@
  * and configures Carbure to send its notifications to it.
  */
 
-use ltoinel\lib\Config;
+use Carbure\lib\Config;
 
 final class FakeApnsServer
 {

@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\Config;
-use ltoinel\lib\Woob;
+use Carbure\lib\Config;
+use Carbure\lib\Woob;
 
 class WoobTest extends TestCase
 {

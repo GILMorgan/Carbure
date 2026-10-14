@@ -1,7 +1,5 @@
 <?php
 
-namespace ltoinel\lib;
-
 /**
  * Installer.php
  *
@@ -13,6 +11,8 @@ namespace ltoinel\lib;
  * @author     Ludovic Toinel
  * @copyright  2026 Carbure App
  */
+
+namespace Carbure\lib;
 
 final class Installer {
 

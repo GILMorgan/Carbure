@@ -1,6 +1,6 @@
 <?php
 
-namespace ltoinel\lib;
+namespace Carbure\lib;
 
 use ReflectionClass;
 use ReflectionMethod;
@@ -96,7 +96,7 @@ final class ApiResolver {
 
         foreach ($resourceFiles as $file) {
             require_once $file;
-            $className = "ltoinel\\resources\\" . basename($file, '.php');
+            $className = "Carbure\\resources\\" . basename($file, '.php');
             
             // Get all methods of the class
             try {

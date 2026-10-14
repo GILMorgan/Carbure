@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\Logger;
-use ltoinel\lib\Webservice;
+use Carbure\lib\Logger;
+use Carbure\lib\Webservice;
 
 /**
  * Fake resource used to test the service dispatch.

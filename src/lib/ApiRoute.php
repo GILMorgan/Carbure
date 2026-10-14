@@ -1,9 +1,5 @@
 <?php
 
-namespace ltoinel\lib;
-
-use Attribute;
-
 /**
  * ApiRoute.php
  *
@@ -12,6 +8,10 @@ use Attribute;
  * @author     Ludovic Toinel
  * @copyright  2026 Carbure App
  */
+
+namespace Carbure\lib;
+
+use Attribute;
 
 #[Attribute(Attribute::TARGET_METHOD)]
 class ApiRoute {

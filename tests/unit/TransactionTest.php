@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\resources\Transaction;
+use Carbure\resources\Transaction;
 
 class TransactionTest extends TestCase
 {

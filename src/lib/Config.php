@@ -8,7 +8,7 @@
  * @author     Ludovic Toinel
  * @copyright  2026 Carbure App
  */
-namespace ltoinel\lib;
+namespace Carbure\lib;
 
 use \Exception;
 

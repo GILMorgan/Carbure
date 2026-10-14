@@ -16,10 +16,10 @@
  * @copyright  2026 Carbure App
  */
 
-namespace ltoinel\resources;
+namespace Carbure\resources;
 
-use ltoinel\lib\ApiRoute;
-use ltoinel\lib\Setting;
+use Carbure\lib\ApiRoute;
+use Carbure\lib\Setting;
 
 final class Mcp {
 

@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\Config;
-use ltoinel\lib\Logger;
+use Carbure\lib\Config;
+use Carbure\lib\Logger;
 
 class LoggerTest extends TestCase
 {

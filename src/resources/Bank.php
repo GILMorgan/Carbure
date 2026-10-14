@@ -9,14 +9,14 @@
  * @copyright  2026 Carbure App
  */
 
-namespace ltoinel\resources;
+namespace Carbure\resources;
 
-use ltoinel\lib\ApiRoute;
-use ltoinel\lib\Db;
-use ltoinel\lib\Jwt;
-use ltoinel\lib\Logger;
-use ltoinel\lib\WebService;
-use ltoinel\lib\Woob;
+use Carbure\lib\ApiRoute;
+use Carbure\lib\Db;
+use Carbure\lib\Jwt;
+use Carbure\lib\Logger;
+use Carbure\lib\WebService;
+use Carbure\lib\Woob;
 
 final class Bank {
     

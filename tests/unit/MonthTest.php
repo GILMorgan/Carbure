@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\Month;
+use Carbure\lib\Month;
 
 class MonthTest extends TestCase
 {

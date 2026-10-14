@@ -1,8 +1,8 @@
 <?php
 
-namespace ltoinel\lib;
+namespace Carbure\lib;
 
-use ltoinel\lib\Logger;
+use Carbure\lib\Logger;
 use Error;
 use Exception;
 

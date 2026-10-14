@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\Config;
-use ltoinel\lib\Jwt;
+use Carbure\lib\Config;
+use Carbure\lib\Jwt;
 
 class JwtTest extends TestCase
 {

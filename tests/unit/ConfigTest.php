@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\Config;
+use Carbure\lib\Config;
 
 class ConfigTest extends TestCase
 {

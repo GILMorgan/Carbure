@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use ltoinel\lib\Apns;
-use ltoinel\lib\Config;
+use Carbure\lib\Apns;
+use Carbure\lib\Config;
 
 class ApnsTest extends TestCase
 {

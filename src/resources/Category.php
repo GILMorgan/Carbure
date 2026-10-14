@@ -1,9 +1,9 @@
 <?php
 
-namespace ltoinel\resources;
+namespace Carbure\resources;
 
-use ltoinel\lib\ApiRoute;
-use ltoinel\lib\Db;
+use Carbure\lib\ApiRoute;
+use Carbure\lib\Db;
 
 /**
  * Category.php

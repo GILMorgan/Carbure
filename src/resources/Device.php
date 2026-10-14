@@ -9,9 +9,9 @@
  * @copyright  2026 Carbure App
  */
 
-namespace ltoinel\resources;
+namespace Carbure\resources;
 
-use ltoinel\lib\ApiRoute;
+use Carbure\lib\ApiRoute;
 
 final class Device {
 
